@@ -6,6 +6,8 @@ namespace DependencyTool.Processors;
 
 public static class Replacer
 {
+    private static Dictionary<(string file, long pathId), string> s_oldPtrToName = new();
+    
     public static void ProcessFiles(AssetsManager manager, string bundlePath, string bundleName, string outputPath)
     {
         string cachePath = Path.Combine(outputPath, Generator.IdDictFileName);
@@ -81,12 +83,11 @@ public static class Replacer
             Console.WriteLine($"Processing file {assetsFile.name}");
             foreach (AssetFileInfo asset in assetsFile.file.AssetInfos)
             {
-                if ((AssetClassID)asset.TypeId is AssetClassID.GameObject or AssetClassID.Transform) continue;
-                
-                Console.WriteLine($"Attempting to fix a {(AssetClassID)asset.TypeId}");
+                Console.WriteLine($"Attempting to fix a {(AssetClassID)asset.TypeId} at {asset.PathId} in {assetsFile.name}");
                 try
                 {
-                    FixPptrs(manager, pathToBundle, assetsFile, manager.GetBaseField(assetsFile, asset), data);
+                    AssetTypeValueField baseField = manager.GetBaseField(assetsFile, asset);
+                    FixPptrs(manager, pathToBundle, assetsFile, baseField, data, asset, baseField);
                 }
                 catch (Exception ex)
                 {
@@ -101,7 +102,7 @@ public static class Replacer
         bundleFile.file.Write(writer);
     }
 
-    private static void FixPptrs(AssetsManager manager, Dictionary<string, AssetsFileInstance> fileNameToFile, AssetsFileInstance file, AssetTypeValueField field, Dictionary<string, AssetData> nameToData)
+    private static void FixPptrs(AssetsManager manager, Dictionary<string, AssetsFileInstance> fileNameToFile, AssetsFileInstance file, AssetTypeValueField field, Dictionary<string, AssetData> nameToData, AssetFileInfo parentAsset, AssetTypeValueField baseFieldInstance)
     {
         if (field.TypeName.Contains("PPtr"))
         {
@@ -122,12 +123,23 @@ public static class Replacer
             
             if (!Program.CacheableAssets.Contains((AssetClassID)asset.TypeId))
             {
-                return;
+                return; 
             }
             
             Console.WriteLine($"File {assetFile.name} asset {asset.PathId}");
-            
-            string assetName = manager.GetBaseField(assetFile, asset)["m_Name"].AsString;
+
+            // this is a horrible hack, but if it is moved you cant call getbasefield on it, so we have to cache info we need from it
+            string assetName;
+            (string name, long PathId) ptr = (assetFile.name, asset.PathId);
+            if (s_oldPtrToName.ContainsKey(ptr))
+            {
+                assetName = s_oldPtrToName[ptr];
+            }
+            else
+            {
+                assetName = manager.GetBaseField(assetFile, asset)["m_Name"].AsString;
+                s_oldPtrToName.Add(ptr, assetName);
+            }
 
             if (!nameToData.ContainsKey(assetName))
             {
@@ -139,14 +151,14 @@ public static class Replacer
             Console.WriteLine($"Was at {field["m_FileID"].AsInt}::{field["m_PathID"].AsLong}, moved to {GetExternalFileId(data.FileName, file)}::{data.PathId}");
             field["m_FileID"].AsInt = GetExternalFileId(data.FileName, file);
             field["m_PathID"].AsLong = data.PathId;
-            asset.SetNewData(field);
+            parentAsset.SetNewData(baseFieldInstance);
             
             return;
         }
 
         foreach (AssetTypeValueField child in field.Children)
         {
-            FixPptrs(manager, fileNameToFile, file, child, nameToData);
+            FixPptrs(manager, fileNameToFile, file, child, nameToData, parentAsset, baseFieldInstance);
         }
     }
 
@@ -185,13 +197,13 @@ public static class Replacer
         
         if (index == -1)
         {
-            file.file.Metadata.Externals.Add(new AssetsFileExternal()
+            /*file.file.Metadata.Externals.Add(new AssetsFileExternal()
             {
                 OriginalPathName = name,
                 PathName = name,
                 VirtualAssetPathName = string.Empty
             });
-            Console.WriteLine($"Added external {name} to {file.name}");
+            Console.WriteLine($"Added external {name} to {file.name}");*/
             return file.file.Metadata.Externals.Count; // -1 to get index, +1 because 0 is self and not a external
         }
 

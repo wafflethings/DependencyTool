@@ -3,3 +3,15 @@ obj/
 /packages/
 riderModule.iml
 /_ReSharper.Caches/
+UnityDependencyGenerator.sln.DotSettings.user
+libs/Mono.Cecil.dll
+libs/AssetStudioUtility.dll
+libs/AssetStudio.dll
+DependencyTool.sln.DotSettings.user
+.idea/.idea.UnityDependencyGenerator/.idea/workspace.xml
+.idea/.idea.DependencyTool/.idea/workspace.xml
+.idea/.idea.DependencyTool/.idea/vcs.xml
+.idea/.idea.DependencyTool/.idea/projectSettingsUpdater.xml
+.idea/.idea.DependencyTool/.idea/indexLayout.xml
+.idea/.idea.DependencyTool/.idea/encodings.xml
+.idea/.idea.DependencyTool/.idea/.name
